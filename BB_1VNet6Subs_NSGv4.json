@@ -1,0 +1,703 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vnetName": {
+      "type": "string",
+      "defaultValue": "PrdVNet",
+      "metadata": {
+        "description": "VNet name"
+      }
+    },
+    "vnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.7.0.0/16",
+      "metadata": {
+        "description": "PrdVnet Address space prefix"
+      }
+    },
+    "DCPrefix": {
+      "type": "string",
+      "defaultValue": "10.7.0.0/24",
+      "metadata": {
+        "description": "DC Subnet Prefix"
+      }
+    },
+    "DCName": {
+      "type": "string",
+      "defaultValue": "DC",
+      "metadata": {
+        "description": "DC Subnet Name"
+      }
+    },
+    "AppSvcPrefix": {
+      "type": "string",
+      "defaultValue": "10.7.1.0/24",
+      "metadata": {
+        "description": "Application Service Subnet Prefix"
+      }
+    },
+    "AppSvcName": {
+      "type": "string",
+      "defaultValue": "AppSvc",
+      "metadata": {
+        "description": "Application Service Subnet Name"
+      }
+    },
+    
+    "SQLPrefix": {
+      "type": "string",
+      "defaultValue": "10.7.4.0/24",
+      "metadata": {
+        "description": "SQL Subnet Prefix"
+      }
+    },
+    "SQLName": {
+      "type": "string",
+      "defaultValue": "SQL",
+      "metadata": {
+        "description": "SQL Subnet Name"
+      }
+    },
+    "AdminPrefix": {
+      "type": "string",
+      "defaultValue": "10.7.5.0/24",
+      "metadata": {
+        "description": "Admin Subnet Prefix"
+      }
+    },
+    "AdminName": {
+      "type": "string",
+      "defaultValue": "Admin",
+      "metadata": {
+        "description": "Admin Subnet Name"
+      }
+    },
+    "DMZPrefix": {
+      "type": "string",
+      "defaultValue": "10.7.15.0/24",
+      "metadata": {
+        "description": "DMZ Subnet Prefix"
+      }
+    },
+    "DMZName": {
+      "type": "string",
+      "defaultValue": "DMZ",
+      "metadata": {
+        "description": "DMZ Name"
+      }
+    },
+    "DCNSGName": {
+      "type": "string",
+      "defaultValue": "DC_NSG",
+      "metadata": {
+        "description": "Name of the NSG that will be assigned to the DC Subnet"
+      }
+    },
+    "DMZNSGName": {
+      "type": "string",
+      "defaultValue": "DMZ_NSG",
+      "metadata": {
+        "description": "Name of the NSG that will be assigned to the DMZ Subnet"
+      }
+    },
+    "AppSvcNSGName": {
+      "type": "string",
+      "defaultValue": "AppSvc_NSG",
+      "metadata": {
+        "description": "Name of the NSG that will be assigned to the Application Service Subnet"
+      }
+    },
+    "SQLNSGName": {
+      "type": "string",
+      "defaultValue": "SQL_NSG",
+      "metadata": {
+        "description": "Name of the NSG that will be assigned to the SQL Subnet"
+      }
+    },
+    "AdminNSGName": {
+      "type": "string",
+      "defaultValue": "Admin_NSG",
+      "metadata": {
+        "description": "Name of the NSG that will be assigned to the Admin Subnet"
+      }
+    }
+  },
+  "variables": {
+    "apiVersion": "2015-06-15"
+  },
+  "resources": [
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('DMZNSGName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_HTTP",
+            "properties": {
+              "description": "Allow Http",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "80",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_HTTPS",
+            "properties": {
+              "description": "Allow Https",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_RDP_Admin",
+            "properties": {
+              "description": "Allow RDP",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('AdminPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 102,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_Internet",
+            "properties": {
+              "description": "Block RDP",
+              "protocol": "tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 250,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_Local",
+            "properties": {
+              "description": "Block RDP",
+              "protocol": "tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 300,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('AppSvcNSGName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_DMZ_HTTP",
+            "properties": {
+              "description": "Allow DMZ Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "80",
+              "sourceAddressPrefix": "[parameters('DMZPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_DMZ_HTTPS",
+            "properties": {
+              "description": "Allow DMZ Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "[parameters('DMZPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_RDP_Admin",
+            "properties": {
+              "description": "Allow RDP",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('AdminPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 102,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_RDP_Local",
+            "properties": {
+              "description": "Allow RDP",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "172.20.0.0/16",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 103,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_DC",
+            "properties": {
+              "description": "Block RDP DC Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('DCPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 200,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_SQL",
+            "properties": {
+              "description": "Block RDP SQL Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('SQLPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 201,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_DMZ",
+            "properties": {
+              "description": "Block DMZ Subnet",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "[parameters('DMZPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 300,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_Internet",
+            "properties": {
+              "description": "Block RDP",
+              "protocol": "tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 250,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('SQLNSGName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_AppSvc",
+            "properties": {
+              "description": "Allow AppSvc Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "9032",
+              "sourceAddressPrefix": "[parameters('AppSvcPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_RDP_Admin",
+            "properties": {
+              "description": "Allow RDP",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('AdminPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_RDP_Local",
+            "properties": {
+              "description": "Allow RDP",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "172.20.0.0/16",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 102,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_AppSvc",
+            "properties": {
+              "description": "Block RDP AppSvc Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('AppSvcPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 200,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_DC",
+            "properties": {
+              "description": "Block RDP DC Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('DCPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 201,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_Internet",
+            "properties": {
+              "description": "Block RDP",
+              "protocol": "tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 250,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_DMZ",
+            "properties": {
+              "description": "Block DMZ Subnet",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "[parameters('DMZPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 300,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_AppSvc",
+            "properties": {
+              "description": "Block AppSvc Subnet",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "[parameters('AppSvcPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 301,
+              "direction": "Inbound"
+            }
+          }
+
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('AdminNSGName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_RDP_Local",
+            "properties": {
+              "description": "Allow RDP",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "172.20.0.0/16",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_AppSvc",
+            "properties": {
+              "description": "Block RDP AppSvc Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('AppSvcPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 200,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_SQL",
+            "properties": {
+              "description": "Block RDP SQL Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('SQLPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 201,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_DC",
+            "properties": {
+              "description": "Block RDP DC Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('DCPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 202,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_Internet",
+            "properties": {
+              "description": "Block RDP",
+              "protocol": "tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 250,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_DMZ",
+            "properties": {
+              "description": "Block DMZ Subnet",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "[parameters('DMZPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 300,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('DCNSGName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_RDP_Admin",
+            "properties": {
+              "description": "Allow RDP",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('AdminPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_RDP_AppSvc",
+            "properties": {
+              "description": "Allow RDP",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('AppSvcPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 200,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Allow_RDP_SQL",
+            "properties": {
+              "description": "Allow RDP",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "[parameters('SQLPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 201,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_Internet",
+            "properties": {
+              "description": "Block RDP",
+              "protocol": "tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 250,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_DMZ",
+            "properties": {
+              "description": "Block DMZ Subnet",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "[parameters('DMZPrefix')]",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 300,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "[variables('apiVersion')]",
+      "type": "Microsoft.Network/virtualNetworks",
+      "name": "[parameters('vnetName')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('DCNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('AppSvcNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('SQLNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('AdminNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('DMZNSGName'))]"
+      ],
+      "properties": {
+        "mode": "Incremental",
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('vnetAddressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[parameters('DCName')]",
+            "properties": {
+              "mode": "Incremental",
+              "addressPrefix": "[parameters('DCPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('DCNSGName'))]"
+              }
+            }
+          },
+          {
+            "name": "[parameters('AppSvcName')]",
+            "properties": {
+              "mode": "Incremental",
+              "addressPrefix": "[parameters('AppSvcPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('AppSvcNSGName'))]"
+              }
+            }
+          },          
+          {
+            "name": "[parameters('SQLName')]",
+            "properties": {
+              "mode": "Incremental",
+              "addressPrefix": "[parameters('SQLPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('SQLNSGName'))]"
+              }
+            }
+          },
+          {
+            "name": "[parameters('AdminName')]",
+            "properties": {
+              "mode": "Incremental",
+              "addressPrefix": "[parameters('AdminPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('AdminNSGName'))]"
+              }
+            }
+          },
+          {
+            "name": "[parameters('DMZName')]",
+            "properties": {
+              "mode": "Incremental",
+              "addressPrefix": "[parameters('DMZPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('DMZNSGName'))]"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
